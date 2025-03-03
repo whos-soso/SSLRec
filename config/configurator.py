@@ -16,10 +16,10 @@ def parse_configure():
     if args.model == None:
         raise Exception("Please provide the model name through --model.")
     model_name = args.model.lower()
-    if not os.path.exists('./config/modelconf/{}.yml'.format(model_name)):
+    if not os.path.exists('/kaggle/working/SSLRec/config/modelconf/{}.yml'.format(model_name)):
         raise Exception("Please create the yaml file for your model first.")
 
-    with open('./config/modelconf/{}.yml'.format(model_name), encoding='utf-8') as f:
+    with open('/kaggle/working/SSLRec/config/modelconf/{}.yml'.format(model_name), encoding='utf-8') as f:
         config_data = f.read()
         configs = yaml.safe_load(config_data)
 
