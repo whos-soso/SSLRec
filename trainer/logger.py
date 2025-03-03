@@ -10,7 +10,7 @@ def get_local_time():
 class Logger(object):
     def __init__(self, log_configs=True):
         model_name = configs['model']['name']
-        log_dir_path = './log/{}'.format(model_name)
+        log_dir_path = '/kaggle/working/SSLRec/log/{}'.format(model_name)
         if not os.path.exists(log_dir_path):
             os.makedirs(log_dir_path)
         self.logger = logging.getLogger('train_logger')
