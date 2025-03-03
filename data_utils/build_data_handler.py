@@ -3,7 +3,7 @@ import importlib
 
 def build_data_handler():
     datahandler_name = 'data_handler_' + configs['data']['type']
-    module_path = ".".join(['data_utils', datahandler_name])
+    module_path = ".".join(['/kaggle/working/SSLRec/data_utils', datahandler_name])
     if importlib.util.find_spec(module_path) is None:
         raise NotImplementedError('DataHandler {} is not implemented'.format(datahandler_name))
     module = importlib.import_module(module_path)
