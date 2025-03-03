@@ -167,7 +167,7 @@ class Trainer(object):
             model_name = configs['model']['name']
             data_name = configs['data']['name']
             if not configs['tune']['enable']:
-                save_dir_path = './checkpoint/{}'.format(model_name)
+                save_dir_path = '/kaggle/working/SSLRec/checkpoint/{}'.format(model_name)
                 if not os.path.exists(save_dir_path):
                     os.makedirs(save_dir_path)
                 timestamp = int(time.time())
@@ -176,7 +176,7 @@ class Trainer(object):
                 self.logger.log("Save model parameters to {}".format(
                     '{}/{}-{}.pth'.format(save_dir_path, model_name, timestamp)))
             else:
-                save_dir_path = './checkpoint/{}/tune'.format(model_name)
+                save_dir_path = '/kaggle/working/SSLRec/checkpoint/{}/tune'.format(model_name)
                 if not os.path.exists(save_dir_path):
                     os.makedirs(save_dir_path)
                 now_para_str = configs['tune']['now_para_str']
