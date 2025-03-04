@@ -3,43 +3,48 @@ optimizer:
   lr: 1.0e-3
   weight_decay: 0
 
+# # training and evaluation
+# epochs: 500
+# train_batch_size: 4096
+# metrics: ["Recall", "MRR", "NDCG", "Hit"]
+# valid_metric: MRR@10
+# training_neg_sample_num: 1
+# topk: [10, 20, 50]
+# eval_batch_size: 1000000
+
+
+
 train:
-  epoch: 300
+  epoch: 200
   batch_size: 4096
   save_model: false
   loss: pairwise
-  log_loss: false
-  test_step: 3
-  patience: 5
+  test_step: 1
+  #pretrain_path: ./checkpoint/xxxx.pth
   reproducible: true
-  seed: 2023
-  trainer: autocf_trainer
+  seed: 421
+  trainer: rgcf_Trainer
 
 test:
   metrics: [recall, ndcg]
   k: [10, 20, 40]
-  batch_size: 1024
+  batch_size: 256
 
 data:
-  type: general_cf
-  name: gowalla
+  type: general_cf # choose in {general_cf, multi_behavior, sequential, social}
+  name: yelp
 
 model:
-  name: autocf
-  keep_rate: 0.2
-  gcn_layer: 2
-  gt_layer: 1
-  reg_weight: 1.0e-6
+  name: rgcl # case-insensitive
+  layer_num: 2
+  reg_weight: 1.0e-5
+  cl_weight: 1.0e-1
+  ib_weight: 1.0e-2
+  temperature: 0.5
   embedding_size: 32
-  head_num: 4
-  ssl_reg: 1
-  seed_num: 100
-  mask_depth: 2
-  fix_steps: 10
-
-tune:
-  enable: false
-  hyperparameters: [gcn_layer, reg_weight, ssl_reg]
-  gcn_layer: [2, 3]
-  reg_weight: [1.0e-6, 1.0e-7, 1.0e-8]
-  ssl_reg: [1.0e-1, 1, 2, 5]
+  gamma: -0.45
+  zeta: 1.05
+  init_temperature: 2.0
+  temperature_decay: 0.98
+  lambda0: 1.0e-4
+  
