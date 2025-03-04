@@ -21,6 +21,10 @@ class DataHandlerGeneralCF:
 			predir = '/kaggle/working/SSLRec/datasets/general_cf/sparse_lastfm/'
 		elif configs['data']['name'] == 'steam':
 			predir = '/kaggle/working/SSLRec/datasets/general_cf/sparse_steam/'
+		elif configs['data']['name'] == 'LLM_steam':
+			predir = '/kaggle/working/SSLRec/datasets/general_cf/LLM_steam/'
+		elif configs['data']['name'] == 'LLM_yelp':
+			predir = '/kaggle/working/SSLRec/datasets/general_cf/LLM_yelp/'
 		self.trn_file = predir + 'train_mat.pkl'
 		self.val_file = predir + 'valid_mat.pkl'
 		self.tst_file = predir + 'test_mat.pkl'
