@@ -15,6 +15,10 @@ class DataHandlerGeneralCF:
 			predir = '/kaggle/working/SSLRec/datasets/general_cf/sparse_gowalla/'
 		elif configs['data']['name'] == 'amazon':
 			predir = '/kaggle/working/SSLRec/datasets/general_cf/sparse_amazon/'
+		elif configs['data']['name'] == 'beer':
+			predir = '/kaggle/working/SSLRec/datasets/general_cf/sparse_beerAdvocate/'
+		elif configs['data']['name'] == 'lastfm':
+			predir = '/kaggle/working/SSLRec/datasets/general_cf/sparse_lastfm/'
 		self.trn_file = predir + 'train_mat.pkl'
 		self.val_file = predir + 'valid_mat.pkl'
 		self.tst_file = predir + 'test_mat.pkl'
