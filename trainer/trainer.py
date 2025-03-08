@@ -1202,97 +1202,82 @@ class AdaGCLTrainer(Trainer):
         else:
             self.logger.log_loss(epoch_idx, loss_log_dict, save_to_log=False)
 
-class DiffKGTrainer(Trainer):
+class AdaGCL_wo_DP_Trainer(Trainer):
     def __init__(self, data_handler, logger):
-        from models.kg.diffkg import GaussianDiffusion, Denoise
-        super(DiffKGTrainer, self).__init__(data_handler, logger)
-        self.diffusion = GaussianDiffusion(configs['model']['noise_scale'], configs['model']['noise_min'], configs['model']['noise_max'], configs['model']['steps']).cuda()
-        out_dims = eval(configs['model']['dims']) + [configs['data']['entity_num']]
-        in_dims = out_dims[::-1]
-        self.denoise = Denoise(in_dims, out_dims, configs['model']['d_emb_size'], norm=True).cuda()
+        from models.general_cf.adagcl import VGAE, DenoiseNet
+        super(AdaGCLTrainer, self).__init__(data_handler, logger)
+        self.generator_1 = VGAE().cuda()
+        self.generator_2 = VGAE().cuda()
 
     def create_optimizer(self, model):
+        self.generator_1.set_adagcl(model)
+        self.generator_2.set_adagcl(model)
+        #model.set_denoiseNet(self.generator_2)
+
         optim_config = configs['optimizer']
         if optim_config['name'] == 'adam':
             self.optimizer = optim.Adam(model.parameters(), lr=optim_config['lr'], weight_decay=optim_config['weight_decay'])
-            self.optimizer_denoise = optim.Adam(self.denoise.parameters(), lr=optim_config['lr'], weight_decay=optim_config['weight_decay'])
-    
+            self.optimizer_gen_1 = optim.Adam(self.generator_1.parameters(), lr=optim_config['lr'], weight_decay=optim_config['weight_decay'])
+            self.optimizer_gen_2 = optim.Adam(filter(lambda p: p.requires_grad, self.generator_2.parameters()), lr=optim_config['lr'], weight_decay=optim_config['weight_decay'])
+
+    def generator_generate(self, model):
+        edge_index = []
+        edge_index.append([])
+        edge_index.append([])
+        adj = deepcopy(self.data_handler.torch_adj)
+        idxs = adj._indices()
+
+        with torch.no_grad():
+            view = model.vgae_generate(self.data_handler.torch_adj, idxs, adj)
+
+        return view
+
     def train_epoch(self, model, epoch_idx):
         train_dataloader = self.data_handler.train_dataloader
         train_dataloader.dataset.sample_negs()
-        diffusionLoader = self.data_handler.diffusionLoader
 
         loss_log_dict = {}
         ep_loss = 0
         steps = len(train_dataloader.dataset) // configs['train']['batch_size']
         model.train()
-        for _, tem in tqdm(enumerate(diffusionLoader), desc='Training Diffusion', total=len(diffusionLoader)):
-            batch_data = list(map(lambda x: x.to(configs['device']), tem))
-
-            ui_matrix = self.data_handler.ui_matrix
-            iEmbeds = model.getEntityEmbeds().detach()
-            uEmbeds = model.getUserEmbeds().detach()
-
-            self.optimizer_denoise.zero_grad()
-            loss_diff, loss_dict_diff = self.diffusion.cal_loss_diff(self.denoise, batch_data, ui_matrix, uEmbeds, iEmbeds)
-            loss_diff.backward()
-            self.optimizer_denoise.step()
-
-        with torch.no_grad():
-            denoised_edges = []
-            h_list = []
-            t_list = []
-
-            for _, tem in enumerate(diffusionLoader):
-                batch_data = list(map(lambda x: x.to(configs['device']), tem))
-                batch_item, batch_index = batch_data
-                denoised_batch = self.diffusion.p_sample(self.denoise, batch_item, configs['model']['sampling_steps'])
-                top_item, indices_ = torch.topk(denoised_batch, k=configs['model']['rebuild_k'])
-                for i in range(batch_index.shape[0]):
-                    for j in range(indices_[i].shape[0]):
-                        h_list.append(batch_index[i])
-                        t_list.append(indices_[i][j])
-
-            edge_set = set()
-            for index in range(len(h_list)):
-                edge_set.add((int(h_list[index].cpu().numpy()), int(t_list[index].cpu().numpy())))
-            for index in range(len(h_list)):
-                if (int(t_list[index].cpu().numpy()), int(h_list[index].cpu().numpy())) not in edge_set:
-                    h_list.append(t_list[index])
-                    t_list.append(h_list[index])
-            
-            relation_dict = self.data_handler.relation_dict
-            for index in range(len(h_list)):
-                try:
-                    denoised_edges.append([h_list[index], t_list[index], relation_dict[int(h_list[index].cpu().numpy())][int(t_list[index].cpu().numpy())]])
-                except Exception:
-                    continue
-            graph_tensor = torch.tensor(denoised_edges)
-            index_ = graph_tensor[:, :-1]
-            type_ = graph_tensor[:, -1]
-            denoisedKG = (index_.t().long().cuda(), type_.long().cuda())
-            model.setDenoisedKG(denoisedKG)
-
-        with torch.no_grad():
-            index_, type_ = denoisedKG
-            mask = ((torch.rand(type_.shape[0]) + configs['model']['keepRate']).floor()).type(torch.bool)
-            denoisedKG = (index_[:, mask], type_[mask])
-            self.generatedKG = denoisedKG
-        
         for _, tem in tqdm(enumerate(train_dataloader), desc='Training Recommender', total=len(train_dataloader)):
-            batch_data = list(map(lambda x: x.long().to(configs['device']), tem))
+            self.optimizer.zero_grad()
+            self.optimizer_gen_1.zero_grad()
+            self.optimizer_gen_2.zero_grad()
 
+            temperature = max(0.05, configs['model']['init_temperature'] * pow(configs['model']['temperature_decay'], epoch_idx))
+
+            batch_data = list(map(lambda x: x.long().to(configs['device']), tem))
+            data1 = self.generator_generate(self.generator_1)
+
+            # loss_cl, loss_dict_cl, out1, out2 = model.cal_loss_cl(batch_data, data1)
+            # ep_loss += loss_cl.item()
+            # loss_cl.backward()
+            # self.optimizer.step()
+            # self.optimizer.zero_grad()
+
+            loss_ib, loss_dict_ib = model.cal_loss_ib(batch_data, data1, out1, out2)
+            ep_loss += loss_ib.item()
+            loss_ib.backward()
+            self.optimizer.step()
             self.optimizer.zero_grad()
 
-            batch_data = list(map(lambda x: x.long().to(configs['device']), tem))
-            loss, loss_dict = model.cal_loss(batch_data, denoisedKG)
-            ep_loss += loss.item()
-            loss.backward()
+            loss_main, loss_dict_main = model.cal_loss(batch_data)
+            ep_loss += loss_main.item()
+            loss_main.backward()
+
+            loss_vgae, loss_dict_vgae = self.generator_1.cal_loss_vgae(self.data_handler.torch_adj, batch_data)
+            loss_denoise, loss_dict_denoise = self.generator_2.cal_loss_denoise(batch_data, temperature)
+            loss_generator = loss_vgae + loss_denoise
+            ep_loss += loss_generator.item()
+            loss_generator.backward()
 
             self.optimizer.step()
+            self.optimizer_gen_1.step()
+            self.optimizer_gen_2.step()
 
-            loss_dict = {**loss_dict}
-            # record loss
+            loss_dict = {**loss_dict_cl, **loss_dict_ib, **loss_dict_main, **loss_dict_vgae, **loss_dict_denoise}
+             # record loss
             for loss_name in loss_dict:
                 _loss_val = float(loss_dict[loss_name]) / len(train_dataloader)
                 if loss_name not in loss_log_dict:
@@ -1307,5 +1292,3 @@ class DiffKGTrainer(Trainer):
             self.logger.log_loss(epoch_idx, loss_log_dict)
         else:
             self.logger.log_loss(epoch_idx, loss_log_dict, save_to_log=False)
-
-        
