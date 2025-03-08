@@ -1,3 +1,4 @@
+#去掉diversy模块（vgae部分）
 optimizer:
   name: adam
   lr: 1.0e-3
