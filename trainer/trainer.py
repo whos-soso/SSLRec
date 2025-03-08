@@ -1202,8 +1202,8 @@ class AdaGCLTrainer(Trainer):
         else:
             self.logger.log_loss(epoch_idx, loss_log_dict, save_to_log=False)
 
-class AdaGCL_wo_DP_Trainer(Trainer): 
-    #去掉vgae模块
+class AdaGCL_wo_GD_Trainer(Trainer): 
+    #去掉去噪模块
     def __init__(self, data_handler, logger):
         from models.general_cf.adagcl import VGAE, DenoiseNet
         super(AdaGCLTrainer, self).__init__(data_handler, logger)
@@ -1294,8 +1294,8 @@ class AdaGCL_wo_DP_Trainer(Trainer):
         else:
             self.logger.log_loss(epoch_idx, loss_log_dict, save_to_log=False)
 
-class AdaGCL_wo_GD_Trainer(Trainer): 
-    #去掉去噪模块
+class AdaGCL_wo_DP_Trainer(Trainer): 
+    #去掉vgae模块
     def __init__(self, data_handler, logger):
         from models.general_cf.adagcl import VGAE, DenoiseNet
         super(AdaGCLTrainer, self).__init__(data_handler, logger)
