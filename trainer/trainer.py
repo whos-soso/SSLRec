@@ -1341,19 +1341,19 @@ class AdaGCL_wo_DP_Trainer(Trainer):
             temperature = max(0.05, configs['model']['init_temperature'] * pow(configs['model']['temperature_decay'], epoch_idx))
 
             batch_data = list(map(lambda x: x.long().to(configs['device']), tem))
-            data1 = self.generator_generate(self.generator_1)
+            #data1 = self.generator_generate(self.generator_1)
 
-            loss_cl, loss_dict_cl, out1, out2 = model.cal_loss_cl(batch_data, data1)
-            ep_loss += loss_cl.item()
-            loss_cl.backward()
-            self.optimizer.step()
-            self.optimizer.zero_grad()
+            # loss_cl, loss_dict_cl, out1, out2 = model.cal_loss_cl(batch_data, data1)
+            # ep_loss += loss_cl.item()
+            # loss_cl.backward()
+            # self.optimizer.step()
+            # self.optimizer.zero_grad()
 
-            loss_ib, loss_dict_ib = model.cal_loss_ib(batch_data, data1, out1, out2)
-            ep_loss += loss_ib.item()
-            loss_ib.backward()
-            self.optimizer.step()
-            self.optimizer.zero_grad()
+            # loss_ib, loss_dict_ib = model.cal_loss_ib(batch_data, data1, out1, out2)
+            # ep_loss += loss_ib.item()
+            # loss_ib.backward()
+            # self.optimizer.step()
+            # self.optimizer.zero_grad()
 
             loss_main, loss_dict_main = model.cal_loss(batch_data)
             ep_loss += loss_main.item()
@@ -1452,17 +1452,17 @@ class AdaGCL_wo_task_Trainer(Trainer):
             ep_loss += loss_main.item()
             loss_main.backward()
 
-            loss_vgae, loss_dict_vgae = self.generator_1.cal_loss_vgae(self.data_handler.torch_adj, batch_data)
-            loss_denoise, loss_dict_denoise = self.generator_2.cal_loss_denoise(batch_data, temperature)
-            loss_generator = loss_vgae + loss_denoise
-            ep_loss += loss_generator.item()
-            loss_generator.backward()
+            # loss_vgae, loss_dict_vgae = self.generator_1.cal_loss_vgae(self.data_handler.torch_adj, batch_data)
+            # loss_denoise, loss_dict_denoise = self.generator_2.cal_loss_denoise(batch_data, temperature)
+            # loss_generator = loss_vgae + loss_denoise
+            # ep_loss += loss_generator.item()
+            # loss_generator.backward()
 
             self.optimizer.step()
             self.optimizer_gen_1.step()
             self.optimizer_gen_2.step()
 
-            loss_dict = {**loss_dict_cl, **loss_dict_ib, **loss_dict_main, **loss_dict_vgae, **loss_dict_denoise}
+            loss_dict = {**loss_dict_cl, **loss_dict_ib, **loss_dict_main}
              # record loss
             for loss_name in loss_dict:
                 _loss_val = float(loss_dict[loss_name]) / len(train_dataloader)
