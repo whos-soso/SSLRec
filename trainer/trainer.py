@@ -1202,10 +1202,10 @@ class AdaGCLTrainer(Trainer):
         else:
             self.logger.log_loss(epoch_idx, loss_log_dict, save_to_log=False)
 
-class AdaGCL_wo_GD_Trainer(Trainer): 
+class AdaGCL_wo_gd_Trainer(Trainer): 
     #去掉去噪模块
     def __init__(self, data_handler, logger):
-        from models.general_cf.adagcl import VGAE, DenoiseNet
+        from models.general_cf.adagcl_wo_gd import VGAE, DenoiseNet
         super(AdaGCLTrainer, self).__init__(data_handler, logger)
         self.generator_1 = VGAE().cuda()
         #self.generator_2 = VGAE().cuda()
@@ -1294,10 +1294,10 @@ class AdaGCL_wo_GD_Trainer(Trainer):
         else:
             self.logger.log_loss(epoch_idx, loss_log_dict, save_to_log=False)
 
-class AdaGCL_wo_DP_Trainer(Trainer): 
+class AdaGCL_wo_dp_Trainer(Trainer): 
     #去掉vgae模块
     def __init__(self, data_handler, logger):
-        from models.general_cf.adagcl import VGAE, DenoiseNet
+        from models.general_cf.adagcl_wo_dp import VGAE, DenoiseNet
         super(AdaGCLTrainer, self).__init__(data_handler, logger)
         #self.generator_1 = VGAE().cuda()
         self.generator_2 = DenoiseNet().cuda()
@@ -1390,7 +1390,7 @@ class AdaGCL_wo_DP_Trainer(Trainer):
 class AdaGCL_wo_task_Trainer(Trainer):
     #去掉优化目标函数
     def __init__(self, data_handler, logger):
-        from models.general_cf.adagcl import VGAE, DenoiseNet
+        from models.general_cf.adagcl_wo_task import VGAE, DenoiseNet
         super(AdaGCLTrainer, self).__init__(data_handler, logger)
         self.generator_1 = VGAE().cuda()
         self.generator_2 = DenoiseNet().cuda()
