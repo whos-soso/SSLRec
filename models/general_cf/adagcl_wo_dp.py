@@ -169,10 +169,10 @@ class VGAE(nn.Module):
 		self.sigmoid = nn.Sigmoid()
 		self.bceloss = nn.BCELoss(reduction='none')
 
-	def set_adagcl(self, adagcl_wo_dp):
+	def set_adagcl(self, adagcl):
 		self.reg_weight = configs['model']['reg_weight']
 
-		self.adagcl_wo_dp = adagcl_wo_dp
+		self.adagcl = adagcl
 
 	def _propagate(self, adj, embeds, flag=True):
 		if flag:
@@ -182,7 +182,7 @@ class VGAE(nn.Module):
 
 	def forward_encoder(self, adj):
 		self.is_training = True
-		x_u, x_i = self.adagcl_wo_dp.forward(adj)
+		x_u, x_i = self.adagcl.forward(adj)
 		x_u, x_i = x_u.detach(), x_i.detach()
 		x = t.concat([x_u, x_i])
 
@@ -261,17 +261,17 @@ class DenoiseNet(nn.Module):
 		self.attentions_0 = nn.Sequential(nn.Linear( 2 * hidden, 1))
 		self.attentions_1 = nn.Sequential(nn.Linear( 2 * hidden, 1))
 
-	def set_adagcl(self, adagcl_wo_dp):
-		self.user_embeds = adagcl_wo_dp.user_embeds
-		self.item_embeds = adagcl_wo_dp.item_embeds
-		self.user_num = adagcl_wo_dp.user_num
-		self.item_num = adagcl_wo_dp.item_num
+	def set_adagcl(self, adagcl):
+		self.user_embeds = adagcl.user_embeds
+		self.item_embeds = adagcl.item_embeds
+		self.user_num = adagcl.user_num
+		self.item_num = adagcl.item_num
 
 		self.layer_num = configs['model']['layer_num']
 		self.reg_weight = configs['model']['reg_weight']
 
 		self.features = t.concat([self.user_embeds, self.item_embeds]).cuda()
-		self.set_fea_adj(self.user_num+self.item_num, adagcl_wo_dp.adj)
+		self.set_fea_adj(self.user_num+self.item_num, adagcl.adj)
 
 	def get_attention(self, input1, input2, layer=0):
 		if layer == 0:
