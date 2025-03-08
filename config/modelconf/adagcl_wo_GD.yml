@@ -12,7 +12,7 @@ train:
   #pretrain_path: ./checkpoint/xxxx.pth
   reproducible: true
   seed: 421
-  trainer: AdaGCLTrainer
+  trainer: AdaGCL_wo_GD_Trainer
 
 test:
   metrics: [recall, ndcg]
