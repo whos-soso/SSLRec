@@ -24,7 +24,7 @@ data:
   name: yelp
 
 model:
-  name: adagcl # case-insensitive
+  name: adagcl_wo_gd # case-insensitive
   layer_num: 2
   reg_weight: 1.0e-5
   cl_weight: 1.0e-1
