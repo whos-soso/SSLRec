@@ -13,7 +13,7 @@ import numpy as np
 init = nn.init.xavier_uniform_
 uniformInit = nn.init.uniform
 
-class AdaGCL(BaseModel):
+class AdaGCL_wo_gd(BaseModel):
 	def __init__(self, data_handler):
 
 		super(AdaGCL, self).__init__(data_handler)
