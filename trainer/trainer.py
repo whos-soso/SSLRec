@@ -1369,7 +1369,7 @@ class AdaGCLwodpTrainer(Trainer):
             #self.optimizer_gen_1.step()
             self.optimizer_gen_2.step()
 
-            loss_dict = {**loss_dict_cl, **loss_dict_ib, **loss_dict_main,  **loss_dict_denoise}
+            loss_dict = {**loss_dict_main,  **loss_dict_denoise}
              # record loss
             for loss_name in loss_dict:
                 _loss_val = float(loss_dict[loss_name]) / len(train_dataloader)
