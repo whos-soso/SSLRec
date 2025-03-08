@@ -16,7 +16,7 @@ uniformInit = nn.init.uniform
 class AdaGCL_wo_task(BaseModel):
 	def __init__(self, data_handler):
 
-		super(AdaGCL, self).__init__(data_handler)
+		super(AdaGCL_wo_task, self).__init__(data_handler)
 
 		self.adj = data_handler.torch_adj
 
