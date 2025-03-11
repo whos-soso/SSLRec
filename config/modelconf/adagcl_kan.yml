@@ -12,8 +12,8 @@ train:
   #pretrain_path: ./checkpoint/xxxx.pth
   reproducible: true
   seed: 421
-  spline_order:2
-  grid_size:2
+  spline_order: 2
+  grid_size: 2
   trainer: AdaGCLKANTrainer
   
   
