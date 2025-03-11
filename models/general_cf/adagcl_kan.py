@@ -162,12 +162,12 @@ class VGAE(nn.Module):
 		
 		# vgae encoder
 		hidden = configs['model']['embedding_size']
-		self.encoder_mean = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, hidden))
-		self.encoder_std = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.Softplus())
+		# self.encoder_mean = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, hidden))
+		# self.encoder_std = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.Softplus())
 
-		#sizes_encoder=2*[hidden]
-		#self.encoder_mean = FastKAN(layers_hidden=sizes_encoder, num_grids=grid_size)
-		#self.encoder_std =nn.Softplus(FastKAN(layers_hidden=sizes_encoder, num_grids=grid_size))
+		sizes_encoder=[hidden] + [hidden] + [hidden]
+		self.encoder_mean = FastKAN(layers_hidden=sizes_encoder, num_grids=grid_size)
+		self.encoder_std =nn.Softplus(FastKAN(layers_hidden=sizes_encoder, num_grids=grid_size))
 
 # def make_mlp(num_features, hidden_dim, out_dim, hidden_layers):
 #     if hidden_layers>=2:
@@ -189,10 +189,10 @@ class VGAE(nn.Module):
 
 
 		# vgae decoder
-		self.decoder = nn.Sequential(nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, 1))
+		#self.decoder = nn.Sequential(nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, 1))
 
-		#sizes_decoder = hidden+hidden*1+1 =2*[hidden]+1
-		#self.decoder = FastKAN(layers_hidden=sizes_decoder, num_grids=grid_size)
+		sizes_decoder = [hidden] + [hidden] + [1]
+		self.decoder = FastKAN(layers_hidden=sizes_decoder, num_grids=grid_size)
 
 
 		
@@ -290,19 +290,6 @@ class DenoiseNet(nn.Module):
 
 		self.attentions_0 = nn.Sequential(nn.Linear( 2 * hidden, 1))
 		self.attentions_1 = nn.Sequential(nn.Linear( 2 * hidden, 1))
-
-
-		#sizes = [num_features] + [hidden_dim]*(hidden_layers-1) + [out_dim]
-		#sizez_layers = 2*[hidden]
-		#self.nblayers_0 = FastKAN(layers_hidden=sizez_layers, num_grids=grid_size)
-		#self.nblayers_1 = FastKAN(layers_hidden=sizez_layers, num_grids=grid_size)
-	
-		#self.selflayers_0 = FastKAN(layers_hidden=sizez_layers, num_grids=grid_size)
-		#self.selflayers_1 = FastKAN(layers_hidden=sizez_layers, num_grids=grid_size)
-
-		#sizes_attentions = 2*[hidden]+1
-		# self.attentions_0 = FastKAN(layers_hidden=sizes_attentions, num_grids=grid_size)
-		# self.attentions_1 = FastKAN(layers_hidden=sizes_attentions, num_grids=grid_size)
 
 
 
