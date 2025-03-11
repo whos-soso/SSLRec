@@ -1360,10 +1360,10 @@ class AdaGCLwodpTrainer(Trainer):
             loss_main.backward()
 
             # loss_vgae, loss_dict_vgae = self.generator_1.cal_loss_vgae(self.data_handler.torch_adj, batch_data)
-             loss_denoise, loss_dict_denoise = self.generator_2.cal_loss_denoise(batch_data, temperature)
-             loss_generator = 0 + loss_denoise
-             ep_loss += loss_generator.item()
-             loss_generator.backward()
+            loss_denoise, loss_dict_denoise = self.generator_2.cal_loss_denoise(batch_data, temperature)
+            loss_generator = 0 + loss_denoise
+            ep_loss += loss_generator.item()
+            loss_generator.backward()
 
             self.optimizer.step()
             #self.optimizer_gen_1.step()
