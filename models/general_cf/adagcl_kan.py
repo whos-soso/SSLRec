@@ -173,7 +173,7 @@ class VGAE(nn.Module):
 
 		sizes_encoder=[hidden] + [hidden] + [hidden]
 		self.encoder_mean = FastKAN(layers_hidden=sizes_encoder, num_grids=self.grid_size)
-		self.encoder_std =nn.Softplus(FastKAN(layers_hidden=sizes_encoder, num_grids=self.grid_size))
+		self.encoder_std =nn.Sequential(FastKAN(layers_hidden=sizes_encoder, num_grids=self.grid_size), nn.Softplus())
 
 # def make_mlp(num_features, hidden_dim, out_dim, hidden_layers):
 #     if hidden_layers>=2:
