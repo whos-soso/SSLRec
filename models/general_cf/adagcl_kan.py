@@ -163,6 +163,8 @@ class AdaGCL_KAN(BaseModel):
 class VGAE(nn.Module):
 	def __init__(self):
 		super(VGAE, self).__init__()
+
+		self.grid_size =configs['model']['grid_size']
 		
 		# vgae encoder
 		hidden = configs['model']['embedding_size']
