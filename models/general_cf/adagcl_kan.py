@@ -26,6 +26,10 @@ class AdaGCL(BaseModel):
 		self.temperature = configs['model']['temperature']
 		self.layer_num = configs['model']['layer_num']
 		self.reg_weight = configs['model']['reg_weight']
+		self.grid_size =configs['model']['grid_size']
+		self.spline_order =configs['model']['spline_order']
+
+		
 
 		self.user_embeds = nn.Parameter(init(t.empty(self.user_num, self.embedding_size)))
 		self.item_embeds = nn.Parameter(init(t.empty(self.item_num, self.embedding_size)))
@@ -166,8 +170,8 @@ class VGAE(nn.Module):
 		# self.encoder_std = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.Softplus())
 
 		sizes_encoder=[hidden] + [hidden] + [hidden]
-		self.encoder_mean = FastKAN(layers_hidden=sizes_encoder, num_grids=grid_size)
-		self.encoder_std =nn.Softplus(FastKAN(layers_hidden=sizes_encoder, num_grids=grid_size))
+		self.encoder_mean = FastKAN(layers_hidden=sizes_encoder, num_grids=self.grid_size)
+		self.encoder_std =nn.Softplus(FastKAN(layers_hidden=sizes_encoder, num_grids=self.grid_size))
 
 # def make_mlp(num_features, hidden_dim, out_dim, hidden_layers):
 #     if hidden_layers>=2:
@@ -192,7 +196,7 @@ class VGAE(nn.Module):
 		#self.decoder = nn.Sequential(nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, 1))
 
 		sizes_decoder = [hidden] + [hidden] + [1]
-		self.decoder = FastKAN(layers_hidden=sizes_decoder, num_grids=grid_size)
+		self.decoder = FastKAN(layers_hidden=sizes_decoder, num_grids=self.grid_size)
 
 
 		
