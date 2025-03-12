@@ -45,14 +45,14 @@ data:
   name: yelp
 
 model:
-  name: adagcl # case-insensitive
+  name: adagcl_kan # case-insensitive
   layer_num: 2
   reg_weight: 1.0e-5
   cl_weight: 1.0e-1
   ib_weight: 1.0e-2
   temperature: 0.5
   embedding_size: 32
-  gamma: -0.45
+  gamma: -0.95
   zeta: 1.05
   init_temperature: 2.0
   temperature_decay: 0.98
