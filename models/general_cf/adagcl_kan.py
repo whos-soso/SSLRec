@@ -194,7 +194,7 @@ class VGAE(nn.Module):
 
 
 
-		vgae decoder
+		#vgae decoder
 		self.decoder = nn.Sequential(nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, 1))
 
 		# sizes_decoder = [hidden] + [hidden] + [1]
