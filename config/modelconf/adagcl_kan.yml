@@ -52,7 +52,7 @@ model:
   ib_weight: 1.0e-2
   temperature: 0.5
   embedding_size: 32
-  gamma: -0.95
+  gamma: -0.75
   zeta: 1.05
   init_temperature: 2.0
   temperature_decay: 0.98
