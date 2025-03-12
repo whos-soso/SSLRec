@@ -194,11 +194,11 @@ class VGAE(nn.Module):
 
 
 
-		# vgae decoder
-		#self.decoder = nn.Sequential(nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, 1))
+		vgae decoder
+		self.decoder = nn.Sequential(nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, 1))
 
-		sizes_decoder = [hidden] + [hidden] + [1]
-		self.decoder = FastKAN(layers_hidden=sizes_decoder, num_grids=self.grid_size)
+		# sizes_decoder = [hidden] + [hidden] + [1]
+		# self.decoder = FastKAN(layers_hidden=sizes_decoder, num_grids=self.grid_size)
 
 
 		
