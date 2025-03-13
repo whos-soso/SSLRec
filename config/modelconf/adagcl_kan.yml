@@ -58,5 +58,5 @@ model:
   temperature_decay: 0.98
   lambda0: 1.0e-4
   spline_order: 2
-  grid_size: 2
+  grid_size: 4
   
