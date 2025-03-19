@@ -25,7 +25,7 @@ data:
 
 model:
   name: adagcl # case-insensitive
-  layer_num: 1
+  layer_num: 3
   reg_weight: 1.0e-1
   cl_weight: 1.0e-1
   ib_weight: 1.0e-2
