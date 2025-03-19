@@ -48,7 +48,7 @@ model:
   name: adagcl_kan # case-insensitive
   layer_num: 1
   reg_weight: 1.0e-5
-  cl_weight: 1
+  cl_weight: 0.1
   ib_weight: 1.0e-2
   temperature: 0.5
   embedding_size: 32
