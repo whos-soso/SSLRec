@@ -324,11 +324,9 @@ class DenoiseNet(nn.Module):
 		input2 = selflayer(input2)
 
 		input10 = t.concat([input1, input2], axis=1)
+		
+		weight10 = self.attentions_0(input10)
 
-		if layer == 0:
-			weight10 = self.attentions_0(input10)
-		if layer == 1:
-			weight10 = self.attentions_1(input10)
 		
 		return weight10
 
