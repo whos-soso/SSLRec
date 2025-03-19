@@ -316,12 +316,9 @@ class DenoiseNet(nn.Module):
 		self.set_fea_adj(self.user_num+self.item_num, adagcl.adj)
 
 	def get_attention(self, input1, input2, layer=0):
-		if layer == 0:
-			nb_layer = self.nblayers_0
-			selflayer = self.selflayers_0
-		if layer == 1:
-			nb_layer = self.nblayers_1
-			selflayer = self.selflayers_1
+
+		nb_layer = self.nblayers_1
+		selflayer = self.selflayers_1
 
 		input1 = nb_layer(input1)
 		input2 = selflayer(input2)
