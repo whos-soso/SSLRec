@@ -252,12 +252,22 @@ class DenoiseNet(nn.Module):
 
 		self.nblayers_0 = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True))
 		self.nblayers_1 = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True))
-
+		self.nblayers_2 = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True))
+		self.nblayers_3 = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True))
+		self.nblayers_4 = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True))
+		
 		self.selflayers_0 = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True))
 		self.selflayers_1 = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True))
+		self.selflayers_2 = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True))
+		self.selflayers_3 = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True))
+		self.selflayers_4 = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True))
+		
 
 		self.attentions_0 = nn.Sequential(nn.Linear( 2 * hidden, 1))
 		self.attentions_1 = nn.Sequential(nn.Linear( 2 * hidden, 1))
+		self.attentions_2 = nn.Sequential(nn.Linear( 2 * hidden, 1))
+		self.attentions_3 = nn.Sequential(nn.Linear( 2 * hidden, 1))
+		self.attentions_4 = nn.Sequential(nn.Linear( 2 * hidden, 1))
 
 	def set_adagcl(self, adagcl):
 		self.user_embeds = adagcl.user_embeds
@@ -272,12 +282,8 @@ class DenoiseNet(nn.Module):
 		self.set_fea_adj(self.user_num+self.item_num, adagcl.adj)
 
 	def get_attention(self, input1, input2, layer=0):
-		if layer == 0:
-			nb_layer = self.nblayers_0
-			selflayer = self.selflayers_0
-		if layer == 1:
-			nb_layer = self.nblayers_1
-			selflayer = self.selflayers_1
+		nb_layer = self.nblayers_1
+		selflayer = self.selflayers_1
 
 		input1 = nb_layer(input1)
 		input2 = selflayer(input2)
