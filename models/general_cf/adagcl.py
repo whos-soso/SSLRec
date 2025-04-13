@@ -7,7 +7,7 @@ from models.loss_utils import cal_bpr_loss, reg_params, cal_infonce_loss
 import torch_sparse
 from copy import deepcopy
 import numpy as np
-
+from torch.nn.modules.module import Module
 from torch.nn.parameter import Parameter
 # from layers import GraphConvolution
 import torch.distributions as tdist
