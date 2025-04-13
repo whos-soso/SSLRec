@@ -464,28 +464,36 @@ class VGAE(nn.Module):
         return t.spmm(adj, embeds) if flag else torch_sparse.spmm(adj.indices(), adj.values(), adj.shape[0], adj.shape[1], embeds)
 
     def encode(self, x, adj):
-        hiddenx = self.gc1(x, adj)
-        e = self.ndist.sample((self.K + self.J, x.shape[1], self.ndim)).squeeze(-1).to(self.device)
-        e = e.mul(self.reweight)
-        hiddene = self.gce(e, adj)
-        hidden1 = hiddenx + hiddene
-        mu = self.gc2(hidden1, adj)
-        logvar = self.gc3(hiddenx, adj)  # deterministic logvar (semi)
-        return mu[self.K:], logvar[self.K:]
+    	if x.dim() == 2:
+        	x = x.unsqueeze(0)  # ensure shape [B, N, D]
+
+    	B, N, D = x.shape
+    	x = x.view(B * N, D)
+    	hidden = self.gc1(x, adj)  # shape: [B*N, H]
+    	hidden = F.relu(hidden)
+    	mu = self.gc_mu(hidden, adj).view(B, N, -1)       # shape: [B, N, latent_dim]
+    	logvar = self.gc_logvar(hidden, adj).view(B, N, -1)
+
+    return mu, logvar
 
     def reparameterize(self, mu, logvar):
-        std = t.exp(logvar / 2.)
-        eps = t.randn_like(std)
-        return eps * std + mu
+    	if self.is_training:
+        	std = t.exp(0.5 * logvar)
+        	eps = t.randn_like(std)
+        	return eps * std + mu
+    	else:
+        	return mu
+
 
     def forward_encoder(self, adj):
-        self.is_training = True
-        x_u, x_i = self.adagcl.forward(adj)
-        x = t.concat([x_u.detach(), x_i.detach()])
-        mu, logvar = self.encode(x.unsqueeze(0), adj)
-        z = self.reparameterize(mu, logvar)
-        return z.squeeze(0), mu.squeeze(0), logvar.squeeze(0)
+    	self.is_training = True
+    	x_u, x_i = self.adagcl.forward(adj)  # 两个扰动样本
+    	x = t.concat([x_u.detach(), x_i.detach()])  # shape: [K+J, N, D]
+   	 mu, logvar = self.encode(x, adj)  # 保留 K+J 个扰动样本
+    	z = self.reparameterize(mu[self.K:], logvar[self.K:])  # 使用后 J 个进行重参数化
+    	return z, mu, logvar
 
+	
     def cal_loss_vgae(self, data, batch_data):
         users, items, neg_items = batch_data
         x, x_mean, x_std = self.forward_encoder(data)
