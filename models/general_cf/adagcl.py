@@ -430,13 +430,6 @@ class GraphConvolution(Module):
                + str(self.out_features) + ')'
 
 
-import torch as t
-import torch.nn as nn
-import torch.nn.functional as F
-from layers import GraphConvolution
-from torch.nn.parameter import Parameter
-import torch.distributions as tdist
-import numpy as np
 
 class GraphDecoder(nn.Module):
     def __init__(self, zdim, dropout, gdc='ip'):
