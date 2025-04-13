@@ -8,6 +8,11 @@ import torch_sparse
 from copy import deepcopy
 import numpy as np
 
+from torch.nn.parameter import Parameter
+# from layers import GraphConvolution
+import torch.distributions as tdist
+
+
 init = nn.init.xavier_uniform_
 uniformInit = nn.init.uniform
 
@@ -153,88 +158,7 @@ class AdaGCL(BaseModel):
 		full_preds = self._mask_predict(full_preds, train_mask)
 		return full_preds
 
-class VGAE(nn.Module):
-	def __init__(self):
-		super(VGAE, self).__init__()
-		
-		# vgae encoder
-		hidden = configs['model']['embedding_size']
-		self.encoder_mean = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, hidden))
-		self.encoder_std = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.Softplus())
 
-		# vgae decoder
-		self.decoder = nn.Sequential(nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, 1))
-		self.sigmoid = nn.Sigmoid()
-		self.bceloss = nn.BCELoss(reduction='none')
-
-	def set_adagcl(self, adagcl):
-		self.reg_weight = configs['model']['reg_weight']
-
-		self.adagcl = adagcl
-
-	def _propagate(self, adj, embeds, flag=True):
-		if flag:
-			return t.spmm(adj, embeds)
-		else:
-			return torch_sparse.spmm(adj.indices(), adj.values(), adj.shape[0], adj.shape[1], embeds)
-
-	def forward_encoder(self, adj):
-		self.is_training = True
-		x_u, x_i = self.adagcl.forward(adj)
-		x_u, x_i = x_u.detach(), x_i.detach()
-		x = t.concat([x_u, x_i])
-
-		x_mean = self.encoder_mean(x)
-		x_std = self.encoder_std(x)
-		gaussian_noise = t.randn(x_mean.shape).cuda()
-		x = gaussian_noise * x_std + x_mean
-		return x, x_mean, x_std
-
-	def cal_loss_vgae(self, data, batch_data):
-		users, items, neg_items = batch_data
-		x, x_mean, x_std = self.forward_encoder(data)
-
-		x_user, x_item = t.split(x, [configs['data']['user_num'], configs['data']['item_num']], dim=0)
-
-		edge_pos_pred = self.sigmoid(self.decoder(x_user[users] * x_item[items]))
-		edge_neg_pred = self.sigmoid(self.decoder(x_user[users] * x_item[neg_items]))
-
-		loss_edge_pos = self.bceloss( edge_pos_pred, t.ones(edge_pos_pred.shape).cuda() )
-		loss_edge_neg = self.bceloss( edge_neg_pred, t.zeros(edge_neg_pred.shape).cuda() )
-		loss_rec = loss_edge_pos + loss_edge_neg
-
-		kl_divergence = - 0.5 * (1 + 2 * t.log(x_std) - x_mean**2 - x_std**2).sum(dim=1)
-
-		ancEmbeds = x_user[users]
-		posEmbeds = x_item[items]
-		negEmbeds = x_item[neg_items]
-
-		bprLoss = cal_bpr_loss(ancEmbeds, posEmbeds, negEmbeds) / ancEmbeds.shape[0]
-
-		beta = 0.1
-		loss = (loss_rec + beta * kl_divergence.mean() + bprLoss).mean()
-
-		losses = {'generate_loss':loss}
-		
-		return loss, losses
-
-	def vgae_generate(self, data, edge_index, adj):
-		x, _, _ = self.forward_encoder(data)
-
-		edge_pred = self.sigmoid(self.decoder(x[edge_index[0]] * x[edge_index[1]]))
-
-		vals = adj._values()
-		idxs = adj._indices()
-		edgeNum = vals.size()
-		edge_pred = edge_pred[:, 0]
-		mask = ((edge_pred + 0.5).floor()).type(t.bool)
-		
-		newVals = vals[mask]
-
-		newVals = newVals / (newVals.shape[0] / edgeNum[0])
-		newIdxs = idxs[:, mask]
-		
-		return t.sparse.FloatTensor(newIdxs, newVals, adj.shape)
 
 class DenoiseNet(nn.Module):
 	def __init__(self):
@@ -432,3 +356,121 @@ class DenoiseNet(nn.Module):
 			return t.spmm(adj, embeds)
 		else:
 			return torch_sparse.spmm(adj.indices(), adj.values(), adj.shape[0], adj.shape[1], embeds)
+
+
+
+
+class GraphDecoder(nn.Module):
+    def __init__(self, zdim, dropout, gdc='ip'):
+        super(GraphDecoder, self).__init__()
+        self.dropout = dropout
+        self.gdc = gdc
+        self.zdim = zdim
+        self.rk_lgt = Parameter(t.FloatTensor(1, zdim))
+        self.reset_parameters()
+        self.SMALL = 1e-16
+
+    def reset_parameters(self):
+        t.nn.init.uniform_(self.rk_lgt, a=-6., b=0.)
+
+    def forward(self, z):
+        z = F.dropout(z, self.dropout, training=self.training)
+        rk = torch.sigmoid(self.rk_lgt).pow(0.5)
+        z = z.mul(rk.view(1, 1, self.zdim))
+        adj_lgt = torch.bmm(z, z.transpose(1, 2))
+        adj = torch.sigmoid(adj_lgt)
+        if not self.training:
+            adj = adj.mean(dim=0, keepdim=True)
+        return adj, z, rk.pow(2)
+
+class VGAE(nn.Module):
+    def __init__(self):
+        super(VGAE, self).__init__()
+        
+        hidden = configs['model']['embedding_size']
+        self.user_num = configs['data']['user_num']
+        self.item_num = configs['data']['item_num']
+        self.reg_weight = configs['model']['reg_weight']
+        self.beta = 0.1
+
+        # Encoder: SIG-VAE
+        self.ndim = 16
+        self.gc1 = GraphConvolution(hidden, hidden, 0.0, act=F.relu)
+        self.gce = GraphConvolution(self.ndim, hidden, 0.0, act=F.relu)
+        self.gc2 = GraphConvolution(hidden, hidden, 0.0, act=lambda x: x)
+        self.gc3 = GraphConvolution(hidden, hidden, 0.0, act=lambda x: x)
+        self.dc = GraphDecoder(hidden, dropout=0.0)
+        self.reweight = ((self.ndim + hidden) / (hidden + hidden))**0.5
+        self.K = configs['model']['K']
+        self.J = configs['model']['J']
+        self.device = 'cuda'
+        self.ndist = tdist.Bernoulli(t.tensor([.5], device=self.device))
+
+        # Decoder and loss
+        self.decoder = nn.Sequential(nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, 1))
+        self.sigmoid = nn.Sigmoid()
+        self.bceloss = nn.BCELoss(reduction='none')
+
+    def set_adagcl(self, adagcl):
+        self.adagcl = adagcl
+
+    def _propagate(self, adj, embeds, flag=True):
+        return t.spmm(adj, embeds) if flag else torch_sparse.spmm(adj.indices(), adj.values(), adj.shape[0], adj.shape[1], embeds)
+
+    def encode(self, x, adj):
+        hiddenx = self.gc1(x, adj)
+        e = self.ndist.sample((self.K + self.J, x.shape[1], self.ndim)).squeeze(-1).to(self.device)
+        e = e.mul(self.reweight)
+        hiddene = self.gce(e, adj)
+        hidden1 = hiddenx + hiddene
+        mu = self.gc2(hidden1, adj)
+        logvar = self.gc3(hiddenx, adj)  # deterministic logvar (semi)
+        return mu[self.K:], logvar[self.K:]
+
+    def reparameterize(self, mu, logvar):
+        std = t.exp(logvar / 2.)
+        eps = t.randn_like(std)
+        return eps * std + mu
+
+    def forward_encoder(self, adj):
+        self.is_training = True
+        x_u, x_i = self.adagcl.forward(adj)
+        x = t.concat([x_u.detach(), x_i.detach()])
+        mu, logvar = self.encode(x.unsqueeze(0), adj)
+        z = self.reparameterize(mu, logvar)
+        return z.squeeze(0), mu.squeeze(0), logvar.squeeze(0)
+
+    def cal_loss_vgae(self, data, batch_data):
+        users, items, neg_items = batch_data
+        x, x_mean, x_std = self.forward_encoder(data)
+
+        x_user, x_item = t.split(x, [self.user_num, self.item_num], dim=0)
+
+        edge_pos_pred = self.sigmoid(self.decoder(x_user[users] * x_item[items]))
+        edge_neg_pred = self.sigmoid(self.decoder(x_user[users] * x_item[neg_items]))
+
+        loss_rec = self.bceloss(edge_pos_pred, t.ones_like(edge_pos_pred)) + \
+                   self.bceloss(edge_neg_pred, t.zeros_like(edge_neg_pred))
+
+        kl_divergence = -0.5 * (1 + 2 * t.log(x_std + 1e-10) - x_mean**2 - x_std**2).sum(dim=1)
+
+        bprLoss = cal_bpr_loss(x_user[users], x_item[items], x_item[neg_items]) / users.shape[0]
+
+        loss = (loss_rec.mean() + self.beta * kl_divergence.mean() + bprLoss).mean()
+        return loss, {'generate_loss': loss}
+
+    def vgae_generate(self, data, edge_index, adj):
+        x, _, _ = self.forward_encoder(data)
+        edge_pred = self.sigmoid(self.decoder(x[edge_index[0]] * x[edge_index[1]]))[:, 0]
+
+        vals = adj._values()
+        idxs = adj._indices()
+        edgeNum = vals.size()
+        mask = ((edge_pred + 0.5).floor()).type(t.bool)
+
+        newVals = vals[mask]
+        newVals = newVals / (newVals.shape[0] / edgeNum[0])
+        newIdxs = idxs[:, mask]
+
+        return t.sparse.FloatTensor(newIdxs, newVals, adj.shape)
+
