@@ -1,4 +1,4 @@
-latent_dimimport torch as t
+import torch as t
 import torch
 
 from torch import nn
