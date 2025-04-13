@@ -487,28 +487,42 @@ class VGAE(nn.Module):
     def _propagate(self, adj, embeds, flag=True):
         return t.spmm(adj, embeds) if flag else torch_sparse.spmm(adj.indices(), adj.values(), adj.shape[0], adj.shape[1], embeds)
 
-    def encode(self, x, adj):
-        hiddenx = self.gc1(x, adj)
-        e = self.ndist.sample((self.K + self.J, x.shape[1], self.ndim)).squeeze(-1).to(self.device)
-        e = e.mul(self.reweight)
-        hiddene = self.gce(e, adj)
-        hidden1 = hiddenx + hiddene
-        mu = self.gc2(hidden1, adj)
-        logvar = self.gc3(hiddenx, adj)  # deterministic logvar (semi)
-        return mu[self.K:], logvar[self.K:]
+    def encode(self, x, edge_index):
+        h = F.relu(self.gc1(x, edge_index))
+        mu = self.gc_mu(h, edge_index)
+        logvar = self.gc_logvar(h, edge_index)
+        return mu, logvar
 
     def reparameterize(self, mu, logvar):
-        std = t.exp(logvar / 2.)
-        eps = t.randn(mu.shape).cuda()
-        return eps * std + mu
+        if self.training:
+            std = torch.exp(0.5 * logvar)
+            eps = torch.randn_like(mu)
+            return eps * std + mu
+        else:
+            return mu
 
     def forward_encoder(self, adj):
-        self.is_training = True
-        x_u, x_i = self.adagcl.forward(adj)
-        x = t.concat([x_u.detach(), x_i.detach()])
-        mu, logvar = self.encode(x.unsqueeze(0), adj)
-        z = self.reparameterize(mu, logvar)
-        return z.squeeze(0), mu.squeeze(0), logvar.squeeze(0)
+        # adj shape: [B, N, N]
+        B, N, _ = adj.size()
+        device = adj.device
+        latent_dim = self.latent_dim
+
+        mu_all = []
+        logvar_all = []
+
+        for i in range(self.K + self.J):
+            x = torch.eye(N, device=device)
+            edge_index = adj[i].nonzero(as_tuple=False).t().contiguous()
+            mu, logvar = self.encode(x, edge_index)
+            mu_all.append(mu)
+            logvar_all.append(logvar)
+
+        mu_all = torch.stack(mu_all)      # [K+J, N, latent_dim]
+        logvar_all = torch.stack(logvar_all)
+
+        assert self.J > 0, "J must be > 0 to compute latent variables."
+        z = self.reparameterize(mu_all[self.K:], logvar_all[self.K:])  # [J, N, latent_dim]
+        return z, mu_all, logvar_all
 
     def cal_loss_vgae(self, data, batch_data):
         users, items, neg_items = batch_data
