@@ -430,6 +430,14 @@ class GraphConvolution(Module):
                + str(self.out_features) + ')'
 
 
+import torch as t
+import torch.nn as nn
+import torch.nn.functional as F
+from layers import GraphConvolution
+from torch.nn.parameter import Parameter
+import torch.distributions as tdist
+import numpy as np
+
 class GraphDecoder(nn.Module):
     def __init__(self, zdim, dropout, gdc='ip'):
         super(GraphDecoder, self).__init__()
@@ -487,21 +495,20 @@ class VGAE(nn.Module):
     def _propagate(self, adj, embeds, flag=True):
         return t.spmm(adj, embeds) if flag else torch_sparse.spmm(adj.indices(), adj.values(), adj.shape[0], adj.shape[1], embeds)
 
-    def encode(self, x, edge_index):
-        h = F.relu(self.gc1(x, edge_index))
-        mu = self.gc_mu(h, edge_index)
-        logvar = self.gc_logvar(h, edge_index)
+    def encode(self, x, adj):
+        hiddenx = self.gc1(x, adj)
+        e = self.ndist.sample((self.K + self.J, x.shape[1], self.ndim)).squeeze(-1).to(self.device)
+        e = e.mul(self.reweight)
+        hiddene = self.gce(e, adj)
+        hidden1 = hiddenx + hiddene
+        mu = self.gc2(hidden1, adj)
+        logvar = self.gc3(hiddenx, adj)  # deterministic logvar (semi)
         return mu, logvar
 
     def reparameterize(self, mu, logvar):
-        if self.training:
-            std = torch.exp(0.5 * logvar)
-            eps = torch.randn_like(mu)
-            return eps * std + mu
-        else:
-            return mu
-
-
+        std = t.exp(logvar / 2.)
+        eps = t.randn_like(std)
+        return eps * std + mu
 
     def forward_encoder(self, adj):
         self.is_training = True
@@ -509,9 +516,8 @@ class VGAE(nn.Module):
         x = t.concat([x_u.detach(), x_i.detach()])
         mu, logvar = self.encode(x.unsqueeze(0), adj)
         z = self.reparameterize(mu, logvar)
-        return z.squeeze(0), mu.squeeze(0), logvar.squeeze(0)	
+        return z.squeeze(0), mu.squeeze(0), logvar.squeeze(0)
 
-	
     def cal_loss_vgae(self, data, batch_data):
         users, items, neg_items = batch_data
         x, x_mean, x_std = self.forward_encoder(data)
@@ -545,3 +551,4 @@ class VGAE(nn.Module):
         newIdxs = idxs[:, mask]
 
         return t.sparse.FloatTensor(newIdxs, newVals, adj.shape)
+
