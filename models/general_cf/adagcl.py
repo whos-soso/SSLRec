@@ -1,4 +1,4 @@
-import torch as t
+latent_dimimport torch as t
 import torch
 
 from torch import nn
@@ -505,7 +505,6 @@ class VGAE(nn.Module):
         # adj shape: [B, N, N]
         B, N = adj.size()
         device = adj.device
-        latent_dim = self.latent_dim
 
         mu_all = []
         logvar_all = []
