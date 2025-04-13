@@ -11,7 +11,7 @@ train:
   test_step: 1
   #pretrain_path: ./checkpoint/xxxx.pth
   reproducible: true
-  seed: 421
+  seed: 42
   trainer: AdaGCLTrainer
 
 test:
@@ -25,8 +25,8 @@ data:
 
 model:
   name: adagcl # case-insensitive
-  layer_num: 3
-  reg_weight: 1.0e-1
+  layer_num: 2
+  reg_weight: 1.0e-5
   cl_weight: 1.0e-1
   ib_weight: 1.0e-2
   temperature: 0.5
@@ -36,4 +36,9 @@ model:
   init_temperature: 2.0
   temperature_decay: 0.98
   lambda0: 1.0e-4
-  
+  edim: 32
+  dropout: 0.
+  encsto: semi
+  gdc: ip
+  K: 15
+  J: 20
