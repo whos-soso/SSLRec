@@ -429,13 +429,6 @@ class GraphConvolution(Module):
                + str(self.in_features) + ' -> ' \
                + str(self.out_features) + ')'
 
-import torch as t
-import torch.nn as nn
-import torch.nn.functional as F
-from layers import GraphConvolution
-from torch.nn.parameter import Parameter
-import torch.distributions as tdist
-import numpy as np
 
 class GraphDecoder(nn.Module):
     def __init__(self, zdim, dropout, gdc='ip'):
@@ -478,8 +471,8 @@ class VGAE(nn.Module):
         self.gc3 = GraphConvolution(hidden, hidden, 0.0, act=lambda x: x)
         self.dc = GraphDecoder(hidden, dropout=0.0)
         self.reweight = ((self.ndim + hidden) / (hidden + hidden))**0.5
-        self.K = configs['model']['K']
-        self.J = configs['model']['J']
+        self.K = 1
+        self.J = 1
         self.device = 'cuda'
         self.ndist = tdist.Bernoulli(t.tensor([.5], device=self.device))
 
@@ -506,7 +499,7 @@ class VGAE(nn.Module):
 
     def reparameterize(self, mu, logvar):
         std = t.exp(logvar / 2.)
-	eps = t.randn(mu.shape).cuda()
+        eps = t.randn(mu.shape).cuda()
         return eps * std + mu
 
     def forward_encoder(self, adj):
@@ -550,4 +543,3 @@ class VGAE(nn.Module):
         newIdxs = idxs[:, mask]
 
         return t.sparse.FloatTensor(newIdxs, newVals, adj.shape)
-
