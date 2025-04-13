@@ -503,7 +503,7 @@ class VGAE(nn.Module):
 
     def forward_encoder(self, adj):
         # adj shape: [B, N, N]
-        B, N, _ = adj.size()
+        B, N = adj.size()
         device = adj.device
         latent_dim = self.latent_dim
 
