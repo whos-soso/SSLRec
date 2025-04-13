@@ -511,7 +511,8 @@ class VGAE(nn.Module):
 
         for i in range(self.K + self.J):
             x = torch.eye(N, device=device)
-            edge_index = adj[i].nonzero(as_tuple=False).t().contiguous()
+            # 将稀疏张量移动到 CPU → 执行 nonzero → 移回 CUDA
+ 	    edge_index = adj[i].cpu().nonzero(as_tuple=False).t().contiguous().cuda()
             mu, logvar = self.encode(x, edge_index)
             mu_all.append(mu)
             logvar_all.append(logvar)
