@@ -471,8 +471,8 @@ class VGAE(nn.Module):
         self.gc3 = GraphConvolution(hidden, hidden, 0.0, act=lambda x: x)
         self.dc = GraphDecoder(hidden, dropout=0.0)
         self.reweight = ((self.ndim + hidden) / (hidden + hidden))**0.5
-        self.K = 1
-        self.J = 1
+        self.K = configs['model']['K']
+        self.J = configs['model']['J']
         self.device = 'cuda'
         self.ndist = tdist.Bernoulli(t.tensor([.5], device=self.device))
 
