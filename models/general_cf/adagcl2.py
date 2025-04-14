@@ -156,7 +156,7 @@ class AdaGCL2(BaseModel):
         return full_preds
 
 def get_negative_mask(batch_size):
-    negative_mask = torch.ones((batch_size, batch_size), dtype=bool, device=self.device)))
+    negative_mask = torch.ones((batch_size, batch_size), dtype=bool, device=self.device)
     for i in range(batch_size):
         negative_mask[i, i] = 0
     return negative_mask
