@@ -79,13 +79,6 @@ class AdaGCL2(BaseModel):
         return mainEmbeds
 
 
-    def get_negative_mask(batch_size):
-        negative_mask = torch.ones((batch_size, batch_size), dtype=bool)
-        for i in range(batch_size):
-            negative_mask[i, i] = 0
-        return negative_mask
-
-
     
     def loss_graphcl(self, x1, x2, users, items):
         T = self.temperature
@@ -161,6 +154,13 @@ class AdaGCL2(BaseModel):
         full_preds = pck_user_embeds @ item_embeds.T
         full_preds = self._mask_predict(full_preds, train_mask)
         return full_preds
+
+def get_negative_mask(batch_size):
+    negative_mask = torch.ones((batch_size, batch_size), dtype=bool)
+    for i in range(batch_size):
+        negative_mask[i, i] = 0
+    return negative_mask
+
 
 class GraphConvolution(Module):
     def __init__(self, in_features, out_features, dropout=0., act=F.relu):
