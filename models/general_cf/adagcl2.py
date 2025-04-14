@@ -34,7 +34,7 @@ class AdaGCL2(BaseModel):
 
         self.w1 = configs['model']['w1']
         self.w2 = configs['model']['w2']
-        self.device = device if device is not None else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = next(self.parameters()).device
     
 
     def set_denoiseNet(self, denoiseNet):
