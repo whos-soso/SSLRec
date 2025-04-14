@@ -207,7 +207,7 @@ class VGAE(nn.Module):
         self.gc2 = GraphConvolution(hidden, hidden, 0.0, act=lambda x: x)
         self.gc3 = GraphConvolution(hidden, hidden, 0.0, act=lambda x: x)
         self.dc = GraphDecoder(hidden, dropout=0.0)
-        self.reweight = ((self.ndim + hidden) / (hidden + hidden))​**​0.5
+        self.reweight = ((self.ndim + hidden) / (hidden + hidden)) ​**​ 0.5
         self.ndist = tdist.Bernoulli(t.tensor([.5], device=self.device))
         self.sigmoid = nn.Sigmoid()
         self.bceloss = nn.BCELoss(reduction='none')
