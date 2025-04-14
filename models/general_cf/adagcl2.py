@@ -78,6 +78,15 @@ class AdaGCL2(BaseModel):
         mainEmbeds = sum(embedsLst)
         return mainEmbeds
 
+
+    def get_negative_mask(batch_size):
+        negative_mask = torch.ones((batch_size, batch_size), dtype=bool)
+        for i in range(batch_size):
+            negative_mask[i, i] = 0
+        return negative_mask
+
+
+    
     def loss_graphcl(self, x1, x2, users, items):
         T = self.temperature
         user_embeddings1, item_embeddings1 = t.split(x1, [self.user_num, self.item_num], dim=0)
@@ -110,12 +119,6 @@ class AdaGCL2(BaseModel):
         loss = - torch.log(loss).mean()   
         return loss
         
-
-    def get_negative_mask(batch_size):
-        negative_mask = torch.ones((batch_size, batch_size), dtype=bool)
-        for i in range(batch_size):
-            negative_mask[i, i] = 0
-        return negative_mask
 
     
     def cal_loss_cl(self, batch_data, generated_adj):
