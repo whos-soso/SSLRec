@@ -101,11 +101,11 @@ class AdaGCL2(BaseModel):
         all_embs2 = t.cat([user_embs2, item_embs2], dim=0)
         all_embs1_abs = all_embs1.norm(dim=1)
         all_embs2_abs = all_embs2.norm(dim=1)
-        batch_size, _ = all_embs1.size()
+        batch_size = all_embs1.shape[0]
         sim_matrix = t.einsum('ik,jk->ij', all_embs1, all_embs2) / t.einsum('i,j->ij', all_embs1_abs, all_embs2_abs)
         sim_matrix = t.exp(sim_matrix / T)
         mask = self.get_negative_mask(batch_size)
-        neg_sim = sim_matrix.masked_select(mask).view(batch_size, -1).to
+        neg_sim = sim_matrix.masked_select(mask).view(batch_size, -1)
         pos_sim = sim_matrix[range(batch_size), range(batch_size)]
         mu = self.w1
         sigma = self.w2
