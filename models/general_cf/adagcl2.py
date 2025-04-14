@@ -78,7 +78,7 @@ class AdaGCL2(BaseModel):
         mainEmbeds = sum(embedsLst)
         return mainEmbeds
     
-    def get_negative_mask(batch_size):
+    def get_negative_mask(self,batch_size):
         negative_mask = torch.ones((batch_size, batch_size), dtype=bool, device=self.device)
         for i in range(batch_size):
             negative_mask[i, i] = 0
