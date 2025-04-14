@@ -34,7 +34,7 @@ class AdaGCL2(BaseModel):
 
         self.w1 = configs['model']['w1']
         self.w2 = configs['model']['w2']
-
+        self.device = device if device is not None else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
 
     def set_denoiseNet(self, denoiseNet):
@@ -229,7 +229,7 @@ class VGAE(nn.Module):
         self.J = configs['model']['J']
         self.ndim = configs['model']['edim']
         self.encsto = configs['model']['encsto']
-        self.gc1 = GraphConvolution(hidden, hidden, 0.0, act=F.relu)  # 修正拼写错误：elf -> self
+        self.gc1 = GraphConvolution(hidden, hidden, 0.0, act=F.relu) 
         self.gce = GraphConvolution(self.ndim, hidden, 0.0, act=F.relu)
         self.gc2 = GraphConvolution(hidden, hidden, 0.0, act=lambda x: x)
         self.gc3 = GraphConvolution(hidden, hidden, 0.0, act=lambda x: x)
