@@ -77,7 +77,12 @@ class AdaGCL2(BaseModel):
             count += 1
         mainEmbeds = sum(embedsLst)
         return mainEmbeds
-
+    
+    def get_negative_mask(batch_size):
+        negative_mask = torch.ones((batch_size, batch_size), dtype=bool, device=self.device)
+        for i in range(batch_size):
+            negative_mask[i, i] = 0
+        return negative_mask
 
     
     def loss_graphcl(self, x1, x2, users, items):
@@ -99,7 +104,7 @@ class AdaGCL2(BaseModel):
         batch_size, _ = all_embs1.size()
         sim_matrix = t.einsum('ik,jk->ij', all_embs1, all_embs2) / t.einsum('i,j->ij', all_embs1_abs, all_embs2_abs)
         sim_matrix = t.exp(sim_matrix / T)
-        mask = get_negative_mask(batch_size)
+        mask = self.get_negative_mask(batch_size)
         neg_sim = sim_matrix.masked_select(mask).view(batch_size, -1).to
         pos_sim = sim_matrix[range(batch_size), range(batch_size)]
         mu = self.w1
@@ -155,11 +160,7 @@ class AdaGCL2(BaseModel):
         full_preds = self._mask_predict(full_preds, train_mask)
         return full_preds
 
-def get_negative_mask(batch_size):
-    negative_mask = torch.ones((batch_size, batch_size), dtype=bool, device=self.device)
-    for i in range(batch_size):
-        negative_mask[i, i] = 0
-    return negative_mask
+
 
 
 class GraphConvolution(Module):
