@@ -7,6 +7,7 @@ from models.loss_utils import cal_bpr_loss, reg_params, cal_infonce_loss
 import torch_sparse
 from copy import deepcopy
 import numpy as np
+import math 
 
 # Class GCN
 import torch
@@ -30,6 +31,11 @@ class AdaGCL2(BaseModel):
         self.item_embeds = nn.Parameter(init(t.empty(self.item_num, self.embedding_size)))
         self.is_training = True
         self.final_embeds = None
+
+        self.w1 = configs['model']['w1']
+        self.w2 = configs['model']['w2']
+
+    
 
     def set_denoiseNet(self, denoiseNet):
         self.denoiseNet = denoiseNet
@@ -88,13 +94,30 @@ class AdaGCL2(BaseModel):
         all_embs2 = t.cat([user_embs2, item_embs2], dim=0)
         all_embs1_abs = all_embs1.norm(dim=1)
         all_embs2_abs = all_embs2.norm(dim=1)
+        batch_size, _ = all_embs1.size()
         sim_matrix = t.einsum('ik,jk->ij', all_embs1, all_embs2) / t.einsum('i,j->ij', all_embs1_abs, all_embs2_abs)
         sim_matrix = t.exp(sim_matrix / T)
-        pos_sim = sim_matrix[np.arange(all_embs1.shape[0]), np.arange(all_embs1.shape[0])]
-        loss = pos_sim / (sim_matrix.sum(dim=1) - pos_sim)
-        loss = - t.log(loss)
+        mask = get_negative_mask(batch_size).to(device)
+        neg_sim = sim_matrix.masked_select(mask).view(batch_size, -1)
+        pos_sim = sim_matrix[range(batch_size), range(batch_size)]
+        mu = self.w1
+        sigma = self.w2
+        weight = 1. / (sigma * math.sqrt(2 * math.pi)) * torch.exp( - (neg_sim.log() * T - mu) ** 2 / (2 * math.pow(sigma, 2)))
+        weight = weight / weight.mean(dim=-1, keepdim=True)
+        Ng = torch.mean(neg_sim * weight.detach(), dim=1)
+        loss = - torch.log(pos_sim / (Ng)).mean()
+        loss = pos_sim / (Ng)
+        loss = - torch.log(loss).mean()   
         return loss
+        
 
+    def get_negative_mask(batch_size):
+        negative_mask = torch.ones((batch_size, batch_size), dtype=bool)
+        for i in range(batch_size):
+            negative_mask[i, i] = 0
+        return negative_mask
+
+    
     def cal_loss_cl(self, batch_data, generated_adj):
         self.is_training = True
         ancs, poss, negs = batch_data
@@ -125,7 +148,7 @@ class AdaGCL2(BaseModel):
         loss = bpr_loss + reg_loss
         losses = {'bpr_loss': bpr_loss, 'reg_loss': reg_loss}
         return loss, losses
-
+    
     def full_predict(self, batch_data):
         user_embeds, item_embeds = self.forward(self.adj)
         self.is_training = False
@@ -491,3 +514,12 @@ class DenoiseNet(nn.Module):
             return t.spmm(adj, embeds)
         else:
             return torch_sparse.spmm(adj.indices(), adj.values(), adj.shape[0], adj.shape[1], embeds)
+
+
+
+
+
+
+
+
+
