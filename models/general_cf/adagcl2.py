@@ -8,6 +8,15 @@ import torch_sparse
 from copy import deepcopy
 import numpy as np
 
+#class gcn
+import torch
+from torch.nn.modules.module import Module
+from torch.nn.parameter import Parameter
+
+import torch.nn.modules.loss
+
+
+
 init = nn.init.xavier_uniform_
 uniformInit = nn.init.uniform
 
@@ -153,17 +162,121 @@ class AdaGCL(BaseModel):
 		full_preds = self._mask_predict(full_preds, train_mask)
 		return full_preds
 
+class GraphConvolution(Module):
+    """
+    GCN layer, based on https://arxiv.org/abs/1609.02907
+    that allows MIMO
+    """
+
+    def __init__(self, in_features, out_features, dropout=0., act=F.relu):
+        super(GraphConvolution, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.dropout = dropout
+        self.act = act
+        self.weight = Parameter(torch.FloatTensor(in_features, out_features))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        torch.nn.init.xavier_uniform_(self.weight)
+
+    def forward(self, input, adj):
+        input = F.dropout(input, self.dropout, self.training)
+        """
+        if the input features are a matrix -- excute regular GCN,
+        if the input features are of shape [K, N, Z] -- excute MIMO GCN with shared weights.
+        """
+        # An alternative to derive XW (line 32 to 35)
+        # W = self.weight.view(
+        #         [1, self.in_features, self.out_features]
+        #         ).expand([input.shape[0], -1, -1])
+        # support = torch.bmm(input, W)
+
+        support = torch.stack(
+                [torch.mm(inp, self.weight) for inp in torch.unbind(input, dim=0)],
+                dim=0)
+        output = torch.stack(
+                [torch.spmm(adj, sup) for sup in torch.unbind(support, dim=0)],
+                dim=0)
+        output = self.act(output)
+        return output
+
+    def __repr__(self):
+        return self.__class__.__name__ + ' (' \
+               + str(self.in_features) + ' -> ' \
+               + str(self.out_features) + ')'
+
+class GraphDecoder(nn.Module):
+    """Decoder for using inner product for prediction."""
+
+    def __init__(self, zdim, dropout, gdc='ip'):
+        super(GraphDecoder, self).__init__()
+        self.dropout = dropout
+        self.gdc = gdc
+        self.zdim = zdim
+        self.rk_lgt = Parameter(torch.FloatTensor(torch.Size([1, zdim])))
+        self.reset_parameters()
+        self.SMALL = 1e-16
+
+    def reset_parameters(self):
+        torch.nn.init.uniform_(self.rk_lgt, a=-6., b=0.)
+
+    def forward(self, z):
+        z = F.dropout(z, self.dropout, training=self.training)
+        assert self.zdim == z.shape[2], 'zdim not compatible!'
+
+        # The variable 'rk' in the code is the square root of the same notation in
+        # http://proceedings.mlr.press/v80/yin18b/yin18b-supp.pdf
+        # i.e., instead of do Z*diag(rk)*Z', we perform [Z*diag(rk)] * [Z*diag(rk)]'.
+        rk = torch.sigmoid(self.rk_lgt).pow(.5)
+
+        # Z shape: [J, N, zdim]
+        # Z' shape: [J, zdim, N]
+        if self.gdc == 'bp':
+            z = z.mul(rk.view(1, 1, self.zdim))
+        adj_lgt = torch.bmm(z, torch.transpose(z, 1, 2))
+
+        if self.gdc == 'ip':
+            adj = torch.sigmoid(adj_lgt)
+        elif self.gdc == 'bp':
+            # 1 - exp( - exp(ZZ'))
+            adj_lgt = torch.clamp(adj_lgt, min=-np.Inf, max=25)
+            adj = 1 - torch.exp(-adj_lgt.exp())
+
+
+        if not self.training:
+            adj = torch.mean(adj, dim=0, keepdim=True)
+        
+        return adj, z, rk.pow(2)
+
+
 class VGAE(nn.Module):
 	def __init__(self):
 		super(VGAE, self).__init__()
-		
-		# vgae encoder
 		hidden = configs['model']['embedding_size']
-		self.encoder_mean = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, hidden))
-		self.encoder_std = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.Softplus())
+		self.K = configs['model']['K']
+        	self.J = configs['model']['J']
+		self.ndim = configs['model']['edim']
+		self.encsto = configs['model']['encsto']
+		
+		elf.gc1 = GraphConvolution(hidden, hidden, 0.0, act=F.relu)
+        	self.gce = GraphConvolution(self.ndim, hidden, 0.0, act=F.relu)
+        	self.gc2 = GraphConvolution(hidden, hidden, 0.0, act=lambda x: x)
+        	self.gc3 = GraphConvolution(hidden, hidden, 0.0, act=lambda x: x)
+        	self.dc = GraphDecoder(hidden, dropout=0.0)
+        	self.reweight = ((self.ndim + hidden) / (hidden + hidden))**0.5
+        	
+        	#self.device = 'cuda'
+        	self.ndist = tdist.Bernoulli(t.tensor([.5], device=self.device))
+		
+		# # vgae encoder
+		# hidden = configs['model']['embedding_size']
+		# self.encoder_mean = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, hidden))
+		# self.encoder_std = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.Softplus())
 
-		# vgae decoder
-		self.decoder = nn.Sequential(nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, 1))
+		# # vgae decoder
+		# self.decoder = nn.Sequential(nn.ReLU(inplace=True), nn.Linear(hidden, hidden), nn.ReLU(inplace=True), nn.Linear(hidden, 1))
+		
 		self.sigmoid = nn.Sigmoid()
 		self.bceloss = nn.BCELoss(reduction='none')
 
@@ -177,22 +290,132 @@ class VGAE(nn.Module):
 			return t.spmm(adj, embeds)
 		else:
 			return torch_sparse.spmm(adj.indices(), adj.values(), adj.shape[0], adj.shape[1], embeds)
+	
+	def encode(self, x, adj):
+	    	if x.dim() == 2:
+	        	x = x.unsqueeze(0)  # [N, F] → [1, N, F]
+	    	assert x.dim() == 3, f'Expected input to be 3D, got {x.dim()}D'
+	
+	    	hiddenx = self.gc1(x, adj)  # [1, N, F]
+	
+	    	if self.ndim >= 1:
+	        	e = self.ndist.sample(torch.Size([self.K + self.J, x.shape[1], self.ndim]))  # [K+J, N, D]
+	        	e = torch.squeeze(e, -1)  # [K+J, N]
+	        	e = e.mul(self.reweight)  # [K+J, N]
+	        	hiddene = self.gce(e, adj)  # [K+J, N, F]
+	    	else:
+	        	print("no randomness.")
+	        	hiddene = torch.zeros(self.K + self.J, hiddenx.shape[1], hiddenx.shape[2], device=self.device)
+	
+	    	hidden1 = hiddenx + hiddene.mean(0, keepdim=True)  # [1, N, F]
+	
+	    # SNR
+	    	p_signal = hiddenx.pow(2.).mean()
+	    	p_noise = hiddene.pow(2.).mean([-2, -1])
+	    	snr = (p_signal / p_noise)
+	
+	    	mu = self.gc2(hidden1, adj)  # [1, N, F]
+	    	EncSto = (self.encsto == 'full')
+	    	hidden_sd = EncSto * hidden1 + (1 - EncSto) * hiddenx
+	    	logvar = self.gc3(hidden_sd, adj)  # [1, N, F]
+	
+	    	mu = mu.squeeze(0)        # [N, F]
+	    	logvar = logvar.squeeze(0)  # [N, F]
+	
+	    	return mu, logvar, snr
 
-	def forward_encoder(self, adj):
-		self.is_training = True
-		x_u, x_i = self.adagcl.forward(adj)
-		x_u, x_i = x_u.detach(), x_i.detach()
-		x = t.concat([x_u, x_i])
+	
+	def reparameterize(self, mu, logvar):
+	        std = torch.exp(logvar / 2.)
+	        eps = torch.randn_like(std)
+	        return eps.mul(std).add(mu), eps
 
-		x_mean = self.encoder_mean(x)
-		x_std = self.encoder_std(x)
+	
+	def forward_encoder(self, x, adj):
+	        mu, logvar, snr = self.encode(x, adj)
 		gaussian_noise = t.randn(x_mean.shape).cuda()
-		x = gaussian_noise * x_std + x_mean
-		return x, x_mean, x_std
+	        x = gaussian_noise * logvar + mu
+		
+	        emb_mu = mu[self.K:, :]
+	        emb_logvar = logvar[self.K:, :]
+	
+	        # check tensor size compatibility
+	        assert len(emb_mu.shape) == len(emb_logvar.shape), 'mu and logvar are not equi-dimension.'
+	
+	        z, eps = self.reparameterize(emb_mu, emb_logvar)
+	
+	        adj_, z_scaled, rk = self.dc(z)
+	
+	        return adj_, mu, logvar, z, z_scaled, eps, rk, snr, x
 
+
+	def loss_function(preds, mu, logvar, emb, eps):	    	
+	    	SMALL = 1e-6
+	    	std = torch.exp(0.5 * logvar)
+	    	J, N, zdim = emb.shape
+	    	K = mu.shape[0] - J
+	
+	    	mu_mix, mu_emb = mu[:K, :], mu[K:, :]
+	    	std_mix, std_emb = std[:K, :], std[K:, :]
+	
+	    	preds = torch.clamp(preds, min=SMALL, max=1-SMALL)
+
+	    	log_prior_ker = torch.sum(- 0.5 * emb.pow(2), dim=[1,2]).mean()
+	
+	
+	    	# compute log_posterior
+	    	# Z.shape = [J, 1, N, zdim]
+	    	Z = emb.view(J, 1, N, zdim)
+	
+	    	# mu_mix.shape = std_mix.shape = [1, K, N, zdim]
+	    	mu_mix = mu_mix.view(1, K, N, zdim)
+	    	std_mix = std_mix.view(1, K, N, zdim)
+	    
+	    	# compute -log std[k] - (Z[j] - mu[k])^2 / 2*std[k]^2 for all (j,k)
+	    	# the shape of result tensor log_post_ker_JK is [J,K]
+	    	log_post_ker_JK = - torch.sum(
+	        	0.5 * ((Z - mu_mix) / (std_mix + SMALL)).pow(2), dim=[-2,-1]
+	    	)
+	
+	    	log_post_ker_JK += - torch.sum(
+	        	(std_mix + SMALL).log(), dim=[-2,-1]
+	    	)
+	
+	    	# compute -log std[j] - (Z[j] - mu[j])^2 / 2*std[j]^2 for j = 1,2,...,J
+	    	# the shape of result tensor log_post_ker_J is [J, 1]
+	    	log_post_ker_J = - torch.sum(
+	        	0.5 * eps.pow(2), dim=[-2,-1]
+	    	)
+	    	log_post_ker_J += - torch.sum(
+	        	(std_emb + SMALL).log(), dim = [-2,-1]
+	    	)
+	    	log_post_ker_J = log_post_ker_J.view(-1,1)
+	
+	
+	    	# bind up log_post_ker_JK and log_post_ker_J into log_post_ker, the shape of result tensor is [J, K+1].
+	    	log_post_ker = torch.cat([log_post_ker_JK, log_post_ker_J], dim=-1)
+	
+	    	# apply "log-mean-exp" to the above tensor
+	    	log_post_ker -= np.log(K + 1.) / J
+	    	# average over J items.
+	    	log_posterior_ker = torch.logsumexp(log_post_ker, dim=-1).mean()
+	
+	    
+	
+	
+	    return  log_prior_ker, log_posterior_ker 
+	
 	def cal_loss_vgae(self, data, batch_data):
 		users, items, neg_items = batch_data
-		x, x_mean, x_std = self.forward_encoder(data)
+		
+		adj_, x_mean, x_std, z, z_scaled, eps, rk, snr, x = self.forward_encoder(data)
+		loss_prior, loss_post = loss_function(
+			preds=recovered, 
+            		mu=x_mean, 
+            		logvar=x_std, 
+            		emb=z, 
+            		eps=eps
+		)
 
 		x_user, x_item = t.split(x, [configs['data']['user_num'], configs['data']['item_num']], dim=0)
 
@@ -203,7 +426,10 @@ class VGAE(nn.Module):
 		loss_edge_neg = self.bceloss( edge_neg_pred, t.zeros(edge_neg_pred.shape).cuda() )
 		loss_rec = loss_edge_pos + loss_edge_neg
 
-		kl_divergence = - 0.5 * (1 + 2 * t.log(x_std) - x_mean**2 - x_std**2).sum(dim=1)
+
+		WU = np.min([epoch/200., 1.])
+		#kl_divergence = - 0.5 * (1 + 2 * t.log(x_std) - x_mean**2 - x_std**2).sum(dim=1)
+		kl_divergence = (loss_post - loss_prior)*WU
 
 		ancEmbeds = x_user[users]
 		posEmbeds = x_item[items]
@@ -212,7 +438,7 @@ class VGAE(nn.Module):
 		bprLoss = cal_bpr_loss(ancEmbeds, posEmbeds, negEmbeds) / ancEmbeds.shape[0]
 
 		beta = 0.1
-		loss = (loss_rec + beta * kl_divergence.mean() + bprLoss).mean()
+		loss = (loss_rec + WU * kl_divergence.mean() + bprLoss).mean()
 
 		losses = {'generate_loss':loss}
 		
