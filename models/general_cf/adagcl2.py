@@ -17,9 +17,9 @@ import torch.nn.modules.loss
 init = nn.init.xavier_uniform_
 uniformInit = nn.init.uniform
 
-class AdaGCL(BaseModel):
+class AdaGCL2(BaseModel):
     def __init__(self, data_handler):
-        super(AdaGCL, self).__init__(data_handler)
+        super(AdaGCL2, self).__init__(data_handler)
         self.adj = data_handler.torch_adj
         self.cl_weight = configs['model']['cl_weight']
         self.ib_weight = configs['model']['ib_weight']
