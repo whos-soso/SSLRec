@@ -100,7 +100,7 @@ class AdaGCL2(BaseModel):
         sim_matrix = t.einsum('ik,jk->ij', all_embs1, all_embs2) / t.einsum('i,j->ij', all_embs1_abs, all_embs2_abs)
         sim_matrix = t.exp(sim_matrix / T)
         mask = get_negative_mask(batch_size)
-        neg_sim = sim_matrix.masked_select(mask).view(batch_size, -1)
+        neg_sim = sim_matrix.masked_select(mask).view(batch_size, -1).to
         pos_sim = sim_matrix[range(batch_size), range(batch_size)]
         mu = self.w1
         sigma = self.w2
@@ -156,7 +156,7 @@ class AdaGCL2(BaseModel):
         return full_preds
 
 def get_negative_mask(batch_size):
-    negative_mask = torch.ones((batch_size, batch_size), dtype=bool)
+    negative_mask = torch.ones((batch_size, batch_size), dtype=bool, device=self.device)))
     for i in range(batch_size):
         negative_mask[i, i] = 0
     return negative_mask
