@@ -255,7 +255,7 @@ class VGAE(nn.Module):
 		super(VGAE, self).__init__()
 		hidden = configs['model']['embedding_size']
 		self.K = configs['model']['K']
-        	self.J = configs['model']['J']
+		self.J = configs['model']['J']
 		self.ndim = configs['model']['edim']
 		self.encsto = configs['model']['encsto']
 		
