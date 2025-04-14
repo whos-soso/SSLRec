@@ -311,13 +311,14 @@ class VGAE(nn.Module):
         loss_edge_neg = self.bceloss( edge_neg_pred, t.zeros(edge_neg_pred.shape).cuda() )
         loss_rec = loss_edge_pos + loss_edge_neg
         WU = np.min([epoch/200., 1.])
-        kl_divergence = (loss_post - loss_prior)*WU
+        reg = (loss_post - loss_prior)*WU
+        kl_divergence = reg*WU.sum(dim=1)
         ancEmbeds = x_user[users]
         posEmbeds = x_item[items]
         negEmbeds = x_item[neg_items]
         bprLoss = cal_bpr_loss(ancEmbeds, posEmbeds, negEmbeds) / ancEmbeds.shape[0]
         beta = 0.1
-        loss = (loss_rec + WU * kl_divergence.mean() + bprLoss).mean()
+        loss = (loss_rec + beta  * kl_divergence.mean() + bprLoss).mean()
         losses = {'generate_loss':loss}
         return loss, losses
 
