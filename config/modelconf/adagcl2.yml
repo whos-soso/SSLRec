@@ -27,7 +27,7 @@ model:
   name: adagcl2 # case-insensitive
   layer_num: 2
   reg_weight: 1.0e-5
-  cl_weight: 1.0e-1
+  cl_weight: 1.0
   ib_weight: 1.0e-2
   temperature: 0.5
   embedding_size: 32
@@ -42,5 +42,5 @@ model:
   gdc: ip
   K: 15
   J: 20
-  w1: 0.7
+  w1: 0.3
   w2: 1.0
